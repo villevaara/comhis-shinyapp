@@ -49,21 +49,21 @@ get_hits_yearly <- function(catalog_data, years, keyword) {
 
 get_hits_per_author <- function (catalog_data,
                                  years,
-                                 keyword,
-                                 publications_yearly) {
+                                 keyword) {
 
   get_author_totals <- function(items_hit) {
     authors <- items_hit$author
     authors_count <- count(authors)
+    colnames(authors_count) <- c("author", "hits")
+    authors_count[, 'author'] <- as.character(authors_count[ ,'author'])
     # remove NA
-    authors_count <- authors_count[!(is.na(authors_count$x)), ]
+    authors_count <- authors_count[!(is.na(authors_count$author)), ]
     # remove < 4 letter names
-    authors_count <- subset(authors_count, stri_length(x) > 3)
+    authors_count <- subset(authors_count, stri_length(author) > 3)
     # order, most hits first
     print(head(authors_count, 10))
     authors_count <- authors_count[order(authors_count$freq,
                                          decreasing = TRUE), ]
-    colnames(authors_count) <- c("author", "hits")
     print(head(authors_count, 10))
     return(authors_count)
   }

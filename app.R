@@ -42,7 +42,9 @@ ui <- shinyUI(fluidPage(
           tabPanel("Freq. hits / Year",
                    plotOutput("hits_averages_plot")),
           tabPanel("Top 10 authors",
-                   plotOutput("hits_authors_plot"))
+                   plotOutput("hits_authors_plot")),
+          tabPanel("Top 10 authorz",
+                   plotOutput("hits_authors_plot2"))
         )
         # 
         # textOutput("text_debug"),
@@ -57,7 +59,7 @@ ui <- shinyUI(fluidPage(
 
 # server data etc
 source("helper_shinytesting.R")
-catalog_data <- readRDS("shinytest2.Rds")
+catalog_data <- readRDS("data/estc-shinytest2.Rds")
 publications_yearly <- get_publications_yearly(catalog_data)
 library(ggplot2)
 
@@ -119,13 +121,26 @@ server <- shinyServer(function(input, output) {
     
     top_10_authors <- get_hits_per_author(catalog_data,
                                           input_years,
-                                          keyword,
-                                          publications_yearly)
+                                          keyword)
     
     qplot(author, data = top_10_authors, geom = "bar",
           weight = hits)
   })
-
+  
+  output$hits_authors_plot2 <- renderPlot({
+    input_years <- c(input$range_years[1], input$range_years[2])
+    keyword <- input$keyword_search
+    
+    top_10_authors <- get_hits_per_author(catalog_data,
+                                          input_years,
+                                          keyword)
+    
+    ggplot(top_10_authors, aes(x = author, y = hits)) +
+      geom_bar(stat = "identity")
+      # coord_flip()
+    
+  })
+  
 })
 
 # Run the application 
