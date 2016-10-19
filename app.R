@@ -8,6 +8,8 @@
 #
 
 library(shiny)
+source("R/generate_constants.R")
+source("R/generate_output.R")
 
 # Define UI for application that draws a histogram
 ui <- shinyUI(fluidPage(
@@ -22,7 +24,7 @@ ui <- shinyUI(fluidPage(
                      "Years:",
                      min = 1450,
                      max = 1850,
-                     value = c(1600, 1750)),
+                     value = c(1500, 1800)),
          textInput("keyword_search",
                    "Keyword:",
                    value = "garden",
@@ -42,15 +44,8 @@ ui <- shinyUI(fluidPage(
           tabPanel("Freq. hits / Year",
                    plotOutput("hits_averages_plot")),
           tabPanel("Top 10 authors",
-                   plotOutput("hits_authors_plot")),
-          tabPanel("Top 10 authorz",
-                   plotOutput("hits_authors_plot2"))
+                   plotOutput("hits_authors_plot"))
         )
-        # 
-        # textOutput("text_debug"),
-        #  plotOutput("year_plot"),
-        #  plotOutput("hits_plot"),
-        #  plotOutput("hits_averages_plot")
       )
    )
 ))
@@ -58,61 +53,58 @@ ui <- shinyUI(fluidPage(
 # Define server logic required to draw a histogram
 
 # server data etc
-source("helper_shinytesting.R")
 catalog_data <- readRDS("data/estc-shinytest2.Rds")
 publications_yearly <- get_publications_yearly(catalog_data)
 library(ggplot2)
 
 server <- shinyServer(function(input, output) {
   
-  output$text_debug <- renderText({
-    sprintf("DEBUG: years low: %s, years high: %s, keyword: %s",
-           input$range_years[1],
-           input$range_years[2],
-           input$keyword_search)
-  })
-   
   output$year_plot <- renderPlot({
     year_min <- input$range_years[1]
     year_max <- input$range_years[2]
-    years  <- publications_yearly$years
+    years  <- publications_yearly$year
     titles <- publications_yearly$titles
     year_min_index <- which(years == year_min)[[1]]
     year_max_index <- which(years == year_max)[[1]]
     years_subset  <- years[year_min_index:year_max_index]
     titles_subset <- titles[year_min_index:year_max_index]
-    estc_subset <- data.frame(years = years_subset,
+    estc_subset <- data.frame(year = years_subset,
                              titles = titles_subset)
     qplot(years_subset, titles_subset, data = estc_subset,
-          geom = c("point", "smooth"))
+          geom = c("point", "smooth")) +
+      labs(x = "Year", y = "Titles", title = "All titles per year")
   })
 
   output$hits_plot <- renderPlot({
     input_years <- c(input$range_years[1], input$range_years[2])
     keyword <- input$keyword_search
+    
     yearly_hits <- get_hits_yearly(catalog_data, input_years, keyword)   
-    years <- yearly_hits$years
-    hits  <- yearly_hits$hits
+    
+    years <- yearly_hits$year
+    hits  <- yearly_hits$titles
     qplot(years, hits, data = yearly_hits,
-          geom = c("point", "smooth"))
+          geom = c("point", "smooth")) +
+      labs(x = "Year", y = "Titles",
+           title = "Titles with keyword per year")
   })
   
   output$hits_averages_plot <- renderPlot({
 
     input_years <- c(input$range_years[1], input$range_years[2])
-    publications_yearly_subset <-
-      subset(publications_yearly, years >= input_years[1] &
-             years <= input_years[2])
     keyword <- input$keyword_search
     
-    yearly_hits <- get_hits_yearly(catalog_data, input_years, keyword)   
-    yearly_hits["total_publications"] <- publications_yearly_subset[2]
-    yearly_hits["averages"] <-
-      yearly_hits["hits"] / yearly_hits["total_publications"]
-    years <- yearly_hits$years
-    averages  <- yearly_hits$averages
-    qplot(years, averages, data = yearly_hits,
-          geom = c("point", "smooth"))
+    title_hits_average <- get_title_hits_average(catalog_data,
+                                                 input_years,
+                                                 keyword,
+                                                 publications_yearly)
+    
+    years <- title_hits_average$year
+    averages  <- title_hits_average$averages
+    qplot(years, averages, data = title_hits_average,
+          geom = c("point", "smooth")) +
+      labs(x = "Year", y = "Titles",
+           title = "Titles with keyword per year, proportional")
   })
   
   output$hits_authors_plot <- renderPlot({
@@ -123,21 +115,11 @@ server <- shinyServer(function(input, output) {
                                           input_years,
                                           keyword)
     
-    qplot(author, data = top_10_authors, geom = "bar",
-          weight = hits)
-  })
-  
-  output$hits_authors_plot2 <- renderPlot({
-    input_years <- c(input$range_years[1], input$range_years[2])
-    keyword <- input$keyword_search
-    
-    top_10_authors <- get_hits_per_author(catalog_data,
-                                          input_years,
-                                          keyword)
-    
-    ggplot(top_10_authors, aes(x = author, y = hits)) +
-      geom_bar(stat = "identity")
-      # coord_flip()
+    ggplot(top_10_authors, aes(x = reorder(author, hits), y = hits)) +
+      geom_bar(stat = "identity") +
+      coord_flip() +
+      labs(x = "Author", y = "Titles",
+           title = "Top 10 authors of titles with keyword")
     
   })
   
