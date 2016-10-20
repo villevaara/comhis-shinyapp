@@ -2,14 +2,36 @@
 library(stringi)
 library(plyr)
 
+
+get_publications_yearly <- function(catalog_data, years) {
+  
+  catalog_years <- catalog_data$publication_year
+  years_range <- years[1]:years[2]
+  years_titles <- vector("integer", length(years_range))
+  publications_yearly <- data.frame(year = years_range,
+                                    titles = years_titles)
+  
+  catalog_years_count <- count(catalog_years) # plyr
+  colnames(catalog_years_count) <- c("year", "titles")
+  # discard out of years_range
+  catalog_years_count <- subset(catalog_years_count,
+                                year >= years_range[1] &
+                                  year <= years_range[length(years_range)])
+  
+  # combine dataframes to fill in years with zero titles
+  publications_yearly$titles <-
+    catalog_years_count[match(publications_yearly$year,
+                              catalog_years_count$year), 2]
+  # fill na with 0
+  publications_yearly$titles[is.na(publications_yearly$titles)] <- 0
+  
+  return(publications_yearly)
+}
+
+
 # should make use of get_publications_yearly, lots of overlap
 get_hits_yearly <- function(catalog_data, years, keyword) {
 
-  years_range <- years[1]:years[2]
-  yearly_hits <- vector("integer", length(years_range))
-  keyword_hits_yearly <- data.frame(year = years_range,
-                                    titles = yearly_hits)
-  
   keyword <- tolower(keyword)
     
   items_considered <- subset(catalog_data,
@@ -20,15 +42,9 @@ get_hits_yearly <- function(catalog_data, years, keyword) {
                       grepl(keyword,
                             tolower(items_considered$title)))
 
-  items_hit_pubyears_count <- count(items_hit$publication_year)
-  colnames(items_hit_pubyears_count) <- c("year", "titles")
-  
-  keyword_hits_yearly$titles <-
-    items_hit_pubyears_count[match(keyword_hits_yearly$year,
-                                   items_hit_pubyears_count$year), 2]
-  # fill na with 0
-  keyword_hits_yearly$titles[is.na(keyword_hits_yearly$titles)] <- 0
-  
+  keyword_hits_yearly <- get_publications_yearly(items_hit,
+                                                 years)
+    
   return(keyword_hits_yearly)
 }
 
@@ -53,7 +69,7 @@ get_title_hits_average <- function (catalog_data,
 }
 
 
-get_hits_per_author <- function (catalog_data,
+get_top10_authors <- function (catalog_data,
                                  years,
                                  keyword) {
 
@@ -68,16 +84,15 @@ get_hits_per_author <- function (catalog_data,
     authors_count <- subset(authors_count,
                             stri_length(author) > 3) # stringi
     # order, most hits first
-    # print(head(authors_count, 10))
     authors_count <- authors_count[order(authors_count$hits,
                                          decreasing = TRUE), ]
     # rownames(authors_count) <- NULL # resets rownames. not needed
-    # print(head(authors_count, 10))
     return(authors_count)
   }
 
   keyword <- tolower(keyword)
-  items_within_timeframe <- subset(catalog_data,
+
+    items_within_timeframe <- subset(catalog_data,
                                publication_year >= years[1] &
                                publication_year <= years[2])
 
